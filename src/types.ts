@@ -22,5 +22,10 @@ export interface MessageAndContact {
 
 export interface WhatsappMessagePayload {
   to: string
-  content: string
+  content?: string
+  image?: {
+    mimetype: string
+    data: string // Base64 content
+    filename?: string
+  }
 }

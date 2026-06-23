@@ -3,6 +3,7 @@ import {
   Client,
   ClientOptions,
   Message,
+  MessageMedia,
   NoAuth
 } from "whatsapp-web.js"
 import {
@@ -13,6 +14,12 @@ import {
 } from "./types"
 import { sleep, waitingTimeBetweenMessages } from "./utils"
 
+interface QueueItem {
+  payload: WhatsappMessagePayload
+  resolve: (value: void) => void
+  reject: (reason: any) => void
+}
+
 export class WhatsappClient extends EventEmitter {
   private client!: Client
   private isReady = false
@@ -20,6 +27,8 @@ export class WhatsappClient extends EventEmitter {
   private lastQr: string | null = null
   private phoneRegistered: string | null = null
   private chromeExecutablePath: string | null = null
+  private queue: QueueItem[] = []
+  private isProcessingQueue = false
 
   constructor(config?: { chromeExecutablePath?: string }) {
     super()
@@ -45,11 +54,11 @@ export class WhatsappClient extends EventEmitter {
       ]
     }
 
-    // Verificar si estamos en Windows para especificar la ruta del ejecutable de Chrome
-    if (process.platform === "win32") {
-      puppeteerConfig.executablePath =
-        this.chromeExecutablePath ||
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    // Configurar la ruta del ejecutable de Chrome/Chromium si se proporciona o si estamos en Windows
+    if (this.chromeExecutablePath) {
+      puppeteerConfig.executablePath = this.chromeExecutablePath
+    } else if (process.platform === "win32") {
+      puppeteerConfig.executablePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
     }
 
     this.client = new Client({
@@ -135,6 +144,7 @@ export class WhatsappClient extends EventEmitter {
       this.isAuthenticated = false
       this.phoneRegistered = null
       this.lastQr = null
+      this.clearQueue(new Error("El cliente se ha desconectado"))
     })
   }
 
@@ -156,9 +166,57 @@ export class WhatsappClient extends EventEmitter {
   }
 
   /**
-   * Envía un mensaje de texto a un número de teléfono utilizando retardos y estados para evitar bloqueos
+   * Limpia la cola de mensajes rechazando todos los pendientes
    */
-  public async sendMessage({ to, content }: WhatsappMessagePayload) {
+  private clearQueue(error: Error) {
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()
+      if (item) {
+        item.reject(error)
+      }
+    }
+  }
+
+  /**
+   * Encola un mensaje para ser enviado de forma secuencial
+   */
+  public sendMessage({ to, content }: WhatsappMessagePayload): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.queue.push({
+        payload: { to, content },
+        resolve,
+        reject
+      })
+      this.processQueue()
+    })
+  }
+
+  /**
+   * Procesa la cola de mensajes secuencialmente
+   */
+  private async processQueue() {
+    if (this.isProcessingQueue) return
+    this.isProcessingQueue = true
+
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()
+      if (!item) continue
+
+      try {
+        await this.sendDirect(item.payload)
+        item.resolve()
+      } catch (error) {
+        item.reject(error)
+      }
+    }
+
+    this.isProcessingQueue = false
+  }
+
+  /**
+   * Envía un mensaje directamente utilizando retardos y estados para evitar bloqueos
+   */
+  private async sendDirect({ to, content, image }: WhatsappMessagePayload) {
     if (!this.isReady) {
       throw new Error("El cliente de WhatsApp no está listo")
     }
@@ -167,7 +225,14 @@ export class WhatsappClient extends EventEmitter {
       await this.client.sendPresenceAvailable()
       await sleep(waitingTimeBetweenMessages() / 4)
 
-      const chatId = `${to}@c.us`
+      let chatId = to
+      if (!chatId.includes("@")) {
+        if (chatId.includes("-") || chatId.length > 15) {
+          chatId = `${chatId}@g.us`
+        } else {
+          chatId = `${chatId}@c.us`
+        }
+      }
       const chat = await this.client.getChatById(chatId)
 
       await sleep(waitingTimeBetweenMessages() / 10)
@@ -176,7 +241,12 @@ export class WhatsappClient extends EventEmitter {
       await sleep(waitingTimeBetweenMessages() / 10)
       await chat.sendStateTyping()
 
-      await chat.sendMessage(content)
+      if (image) {
+        const media = new MessageMedia(image.mimetype, image.data, image.filename || "image.jpg")
+        await chat.sendMessage(media, content ? { caption: content } : undefined)
+      } else {
+        await chat.sendMessage(content || "")
+      }
 
       await sleep(waitingTimeBetweenMessages() / 3)
       await this.client.sendPresenceUnavailable()
@@ -189,9 +259,31 @@ export class WhatsappClient extends EventEmitter {
   }
 
   /**
+   * Obtiene la lista de grupos en los que participa el cliente
+   */
+  public async getGroups(): Promise<Array<{ id: string; name: string }>> {
+    if (!this.isReady) {
+      throw new Error("El cliente de WhatsApp no está listo")
+    }
+
+    try {
+      const chats = await this.client.getChats()
+      const groups = chats.filter((chat) => chat.isGroup)
+      return groups.map((group) => ({
+        id: group.id._serialized,
+        name: group.name
+      }))
+    } catch (error) {
+      console.error("Error al obtener la lista de grupos:", error)
+      throw error
+    }
+  }
+
+  /**
    * Cierra el cliente destruyendo la sesión actual de Puppeteer
    */
   public async logout() {
+    this.clearQueue(new Error("El cliente se está cerrando"))
     if (this.client) {
       try {
         await this.client.destroy()
