@@ -1,0 +1,36 @@
+# Dependencias
+node_modules/
+
+# Salida de compilación
+dist/
+out/
+
+# Variables de entorno / Secretos
+.env
+.env.local
+.env.production
+.env.development
+
+# Sesión y caché de whatsapp-web.js (¡Muy importante para seguridad!)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Registros / Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Configuraciones de editores e IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Archivos del sistema operativo
+Thumbs.db
+.DS_Store
