@@ -5,11 +5,12 @@ import { WhatsappClient } from "./WhatsappClient"
 dotenv.config()
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: "50mb" }))
 
 const port = process.env.PORT || 3000
 const webhookUrl = process.env.WEBHOOK_URL || null
 const chromeExecutablePath = process.env.CHROME_PATH || undefined
+const supportedImageMimetypes = new Set(["image/jpeg", "image/jpg", "image/png"])
 
 console.log("Iniciando API REST de WhatsApp...")
 console.log(`Puerto configurado: ${port}`)
@@ -187,10 +188,23 @@ app.post("/send", async (req, res) => {
     })
   }
 
-  if (image && (!image.mimetype || !image.data)) {
+  if (
+    image &&
+    (typeof image.mimetype !== "string" ||
+      !image.mimetype.trim() ||
+      typeof image.data !== "string" ||
+      !image.data.trim())
+  ) {
     return res.status(400).json({
       success: false,
       error: "La estructura de 'image' requiere 'mimetype' y 'data' (base64)."
+    })
+  }
+
+  if (image && !supportedImageMimetypes.has(image.mimetype.toLowerCase())) {
+    return res.status(400).json({
+      success: false,
+      error: `Mimetype de imagen no permitido: '${image.mimetype}'. Use image/jpeg o image/png.`
     })
   }
 

@@ -81,10 +81,10 @@ export class WhatsappClient extends EventEmitter {
     this.client.on("ready", async () => {
       this.isReady = true
       this.isAuthenticated = true
-      
+
       const clientInfo = this.client.info
       this.phoneRegistered = clientInfo.wid.user
-      
+
       console.log(`⚡ Cliente de WhatsApp listo. Teléfono registrado: ${this.phoneRegistered}`)
       this.emit("ready")
     })
@@ -180,10 +180,10 @@ export class WhatsappClient extends EventEmitter {
   /**
    * Encola un mensaje para ser enviado de forma secuencial
    */
-  public sendMessage({ to, content }: WhatsappMessagePayload): Promise<void> {
+  public sendMessage({ to, content, image }: WhatsappMessagePayload): Promise<void> {
     return new Promise((resolve, reject) => {
       this.queue.push({
-        payload: { to, content },
+        payload: { to, content, image },
         resolve,
         reject
       })
@@ -242,7 +242,12 @@ export class WhatsappClient extends EventEmitter {
       await chat.sendStateTyping()
 
       if (image) {
-        const media = new MessageMedia(image.mimetype, image.data, image.filename || "image.jpg")
+        // MessageMedia espera únicamente el contenido Base64. También admitimos
+        // data URLs para que los consumidores no tengan que normalizarlas antes.
+        const base64Data = image.data.replace(/^data:[^;]+;base64,/, "")
+        const mimetype = image.mimetype.toLowerCase() === "image/jpg" ? "image/jpeg" : image.mimetype.toLowerCase()
+        const defaultFilename = mimetype === "image/png" ? "image.png" : "image.jpg"
+        const media = new MessageMedia(mimetype, base64Data, image.filename || defaultFilename)
         await chat.sendMessage(media, content ? { caption: content } : undefined)
       } else {
         await chat.sendMessage(content || "")
