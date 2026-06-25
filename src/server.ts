@@ -1,70 +1,50 @@
-import express from "express"
-import * as dotenv from "dotenv"
-import { WhatsappClient } from "./WhatsappClient"
+import * as dotenv from "dotenv";
 
-dotenv.config()
+import { WhatsappClient } from "./WhatsappClient";
+import express from "express";
 
-const app = express()
-app.use(express.json({ limit: "50mb" }))
+dotenv.config();
 
-const port = process.env.PORT || 3000
-const webhookUrl = process.env.WEBHOOK_URL || null
-const chromeExecutablePath = process.env.CHROME_PATH || undefined
-const authDataPath = process.env.WHATSAPP_AUTH_DATA_PATH || ".wwebjs_auth"
-const supportedImageMimetypes = new Set(["image/jpeg", "image/jpg", "image/png"])
+const app = express();
+app.use(express.json({ limit: "50mb" }));
 
-console.log("Iniciando API REST de WhatsApp...")
-console.log(`Puerto configurado: ${port}`)
-console.log(`Webhook URL configurado: ${webhookUrl || "Ninguno"}`)
-console.log(`Ruta de sesión configurada: ${authDataPath}`)
+const port = process.env.PORT || 3000;
+const chromeExecutablePath = process.env.CHROME_PATH || undefined;
+const authDataPath = process.env.WHATSAPP_AUTH_DATA_PATH || ".wwebjs_auth";
+const supportedImageMimetypes = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+]);
 
-const client = new WhatsappClient({ chromeExecutablePath, authDataPath })
+console.log("Iniciando API REST de WhatsApp...");
+console.log(`Puerto configurado: ${port}`);
+console.log(`Webhook URL configurado: ${webhookUrl || "Ninguno"}`);
+console.log(`Ruta de sesión configurada: ${authDataPath}`);
 
-let lastQr: string | null = null
+const client = new WhatsappClient({ chromeExecutablePath, authDataPath });
+
+let lastQr: string | null = null;
 
 // Registrar eventos
 client.on("qr", (qr) => {
-  lastQr = qr
-  console.log("Nuevo código QR generado.")
-})
+  lastQr = qr;
+  console.log("Nuevo código QR generado.");
+});
 
 client.on("ready", () => {
-  lastQr = null
-  console.log("El cliente de WhatsApp está LISTO.")
-})
+  lastQr = null;
+  console.log("El cliente de WhatsApp está LISTO.");
+});
 
 client.on("authenticated", () => {
-  console.log("Cliente autenticado con éxito.")
-})
+  console.log("Cliente autenticado con éxito.");
+});
 
 client.on("disconnected", () => {
-  lastQr = null
-  console.log("Cliente desconectado de WhatsApp.")
-})
-
-// Reenvío de mensajes entrantes a un Webhook
-client.on("message", async (msgAndContact) => {
-  if (!webhookUrl) return
-
-  try {
-    console.log(`Enviando mensaje recibido de ${msgAndContact.contact.phoneNumber} al webhook...`)
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(msgAndContact)
-    })
-
-    if (!response.ok) {
-      console.error(`Error en la respuesta del Webhook (Status: ${response.status})`)
-    } else {
-      console.log(`Mensaje enviado al Webhook con éxito.`)
-    }
-  } catch (err: any) {
-    console.error(`Fallo al conectar con el Webhook en ${webhookUrl}:`, err.message)
-  }
-})
+  lastQr = null;
+  console.log("Cliente desconectado de WhatsApp.");
+});
 
 // Endpoints
 app.get("/status", (req, res) => {
@@ -72,20 +52,22 @@ app.get("/status", (req, res) => {
     ready: client.isClientReady(),
     authenticated: client.isClientAuthenticated(),
     phoneRegistered: client.getPhoneRegistered(),
-    hasQr: !!lastQr
-  })
-})
+    hasQr: !!lastQr,
+  });
+});
 
 app.get("/qr", (req, res) => {
   if (client.isClientReady()) {
-    return res.send("<h1>El cliente ya está listo y conectado.</h1>")
+    return res.send("<h1>El cliente ya está listo y conectado.</h1>");
   }
   if (!lastQr) {
-    return res.send("<h1>Esperando la generación del código QR... Refresca en unos segundos.</h1>")
+    return res.send(
+      "<h1>Esperando la generación del código QR... Refresca en unos segundos.</h1>",
+    );
   }
 
   // Generar código QR utilizando un generador online por CDN
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQr)}`
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQr)}`;
 
   res.send(`
     <!DOCTYPE html>
@@ -170,24 +152,24 @@ app.get("/qr", (req, res) => {
       </div>
     </body>
     </html>
-  `)
-})
+  `);
+});
 
 app.post("/send", async (req, res) => {
-  const { to, content, image } = req.body
+  const { to, content, image } = req.body;
 
   if (!to) {
     return res.status(400).json({
       success: false,
-      error: "El campo 'to' es obligatorio."
-    })
+      error: "El campo 'to' es obligatorio.",
+    });
   }
 
   if (!content && !image) {
     return res.status(400).json({
       success: false,
-      error: "Debe proporcionar al menos 'content' o una 'image' para enviar."
-    })
+      error: "Debe proporcionar al menos 'content' o una 'image' para enviar.",
+    });
   }
 
   if (
@@ -199,62 +181,62 @@ app.post("/send", async (req, res) => {
   ) {
     return res.status(400).json({
       success: false,
-      error: "La estructura de 'image' requiere 'mimetype' y 'data' (base64)."
-    })
+      error: "La estructura de 'image' requiere 'mimetype' y 'data' (base64).",
+    });
   }
 
   if (image && !supportedImageMimetypes.has(image.mimetype.toLowerCase())) {
     return res.status(400).json({
       success: false,
-      error: `Mimetype de imagen no permitido: '${image.mimetype}'. Use image/jpeg o image/png.`
-    })
+      error: `Mimetype de imagen no permitido: '${image.mimetype}'. Use image/jpeg o image/png.`,
+    });
   }
 
   try {
-    await client.sendMessage({ to, content, image })
+    await client.sendMessage({ to, content, image });
     res.json({
       success: true,
-      message: "Mensaje enviado o encolado exitosamente."
-    })
+      message: "Mensaje enviado o encolado exitosamente.",
+    });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      error: error.message || "Fallo interno al procesar el envío del mensaje."
-    })
+      error: error.message || "Fallo interno al procesar el envío del mensaje.",
+    });
   }
-})
+});
 
 app.get("/groups", async (req, res) => {
   try {
-    const groups = await client.getGroups()
+    const groups = await client.getGroups();
     res.json({
       success: true,
-      groups
-    })
+      groups,
+    });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      error: error.message || "Fallo al obtener la lista de grupos."
-    })
+      error: error.message || "Fallo al obtener la lista de grupos.",
+    });
   }
-})
+});
 
 // Iniciar el cliente de WhatsApp
-client.initialize()
+client.initialize();
 
 // Escuchar peticiones HTTP
 const server = app.listen(port, () => {
-  console.log(`🚀 Servidor API REST escuchando en http://localhost:${port}`)
-})
+  console.log(`🚀 Servidor API REST escuchando en http://localhost:${port}`);
+});
 
 // Manejo de apagado ordenado
 export function shutdown() {
-  console.log("\nApagando servidor API y deteniendo cliente de WhatsApp...")
+  console.log("\nApagando servidor API y deteniendo cliente de WhatsApp...");
   server.close(async () => {
-    await client.logout()
-    process.exit(0)
-  })
+    await client.logout();
+    process.exit(0);
+  });
 }
 
-process.on("SIGINT", shutdown)
-process.on("SIGTERM", shutdown)
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
