@@ -1,0 +1,30 @@
+services:
+  whatsapp-standalone:
+    image: patrickrios/whatsapp-standalone:latest
+    container_name: whatsapp-standalone
+    restart: unless-stopped
+    ports:
+      - "${WHATSAPP_PORT:-3001}:3000"
+    environment:
+      PORT: "3000"
+      CHROME_PATH: "/usr/bin/google-chrome-stable"
+      WHATSAPP_AUTH_DATA_PATH: "/app/.wwebjs_auth"
+      # Opcional: URL a la que se reenviarán los mensajes entrantes.
+      # Ejemplo: http://host.docker.internal:3000/api/whatsapp/webhook
+      WEBHOOK_URL: "${WHATSAPP_WEBHOOK_URL:-}"
+    volumes:
+      # Mantiene la sesión vinculada aunque el contenedor se reinicie o se recree.
+      - whatsapp_session:/app/.wwebjs_auth
+      # Cache de whatsapp-web.js para evitar descargas/reinicios innecesarios.
+      - whatsapp_cache:/app/.wwebjs_cache
+    shm_size: "1gb"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  whatsapp_session:
+  whatsapp_cache:

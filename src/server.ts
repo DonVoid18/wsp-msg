@@ -10,13 +10,15 @@ app.use(express.json({ limit: "50mb" }))
 const port = process.env.PORT || 3000
 const webhookUrl = process.env.WEBHOOK_URL || null
 const chromeExecutablePath = process.env.CHROME_PATH || undefined
+const authDataPath = process.env.WHATSAPP_AUTH_DATA_PATH || ".wwebjs_auth"
 const supportedImageMimetypes = new Set(["image/jpeg", "image/jpg", "image/png"])
 
 console.log("Iniciando API REST de WhatsApp...")
 console.log(`Puerto configurado: ${port}`)
 console.log(`Webhook URL configurado: ${webhookUrl || "Ninguno"}`)
+console.log(`Ruta de sesión configurada: ${authDataPath}`)
 
-const client = new WhatsappClient({ chromeExecutablePath })
+const client = new WhatsappClient({ chromeExecutablePath, authDataPath })
 
 let lastQr: string | null = null
 

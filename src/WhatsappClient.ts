@@ -2,9 +2,9 @@ import { EventEmitter } from "events"
 import {
   Client,
   ClientOptions,
+  LocalAuth,
   Message,
-  MessageMedia,
-  NoAuth
+  MessageMedia
 } from "whatsapp-web.js"
 import {
   Contact,
@@ -27,13 +27,17 @@ export class WhatsappClient extends EventEmitter {
   private lastQr: string | null = null
   private phoneRegistered: string | null = null
   private chromeExecutablePath: string | null = null
+  private authDataPath = ".wwebjs_auth"
   private queue: QueueItem[] = []
   private isProcessingQueue = false
 
-  constructor(config?: { chromeExecutablePath?: string }) {
+  constructor(config?: { chromeExecutablePath?: string; authDataPath?: string }) {
     super()
     if (config?.chromeExecutablePath) {
       this.chromeExecutablePath = config.chromeExecutablePath
+    }
+    if (config?.authDataPath) {
+      this.authDataPath = config.authDataPath
     }
   }
 
@@ -62,10 +66,14 @@ export class WhatsappClient extends EventEmitter {
     }
 
     this.client = new Client({
-      authStrategy: new NoAuth(),
+      authStrategy: new LocalAuth({
+        dataPath: this.authDataPath
+      }),
       puppeteer: puppeteerConfig,
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
     })
+
+    console.log(`Sesión de WhatsApp configurada en: ${this.authDataPath}`)
 
     this.attachEventListeners()
     this.client.initialize()

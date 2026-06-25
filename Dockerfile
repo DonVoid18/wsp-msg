@@ -25,6 +25,9 @@ FROM node:20-slim
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 # Configurar la ruta de Chrome para el cliente de WhatsApp
 ENV CHROME_PATH=/usr/bin/google-chrome-stable
+# Carpeta donde whatsapp-web.js guarda la sesión vinculada.
+# Debe montarse como volumen para sobrevivir reinicios/recreaciones del contenedor.
+ENV WHATSAPP_AUTH_DATA_PATH=/app/.wwebjs_auth
 
 # Instalar dependencias necesarias para Google Chrome y la ejecución de Puppeteer
 RUN apt-get update && apt-get install -y wget gnupg curl ca-certificates --no-install-recommends \
@@ -61,6 +64,9 @@ COPY demo.ts tsconfig.json ./
 
 # Exponer el puerto de la API REST
 EXPOSE 3000
+
+# Persistencia de la sesión de WhatsApp
+VOLUME ["/app/.wwebjs_auth"]
 
 # Comando para ejecutar la API de producción
 CMD ["pnpm", "start"]
