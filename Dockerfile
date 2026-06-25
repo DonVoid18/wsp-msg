@@ -25,9 +25,6 @@ FROM node:20-slim
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 # Configurar la ruta de Chrome para el cliente de WhatsApp
 ENV CHROME_PATH=/usr/bin/google-chrome-stable
-# Carpeta donde whatsapp-web.js guarda la sesión vinculada.
-# Debe montarse como volumen para sobrevivir reinicios/recreaciones del contenedor.
-ENV WHATSAPP_AUTH_DATA_PATH=/app/.wwebjs_auth
 
 # Instalar dependencias necesarias para Google Chrome y la ejecución de Puppeteer
 RUN apt-get update && apt-get install -y wget gnupg curl ca-certificates --no-install-recommends \
@@ -35,14 +32,14 @@ RUN apt-get update && apt-get install -y wget gnupg curl ca-certificates --no-in
     && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
-       fonts-ipafont-gothic \
-       fonts-wqy-zenhei \
-       fonts-thai-tlwg \
-       fonts-khmeros \
-       fonts-kacst \
-       fonts-freefont-ttf \
-       libxss1 \
-       --no-install-recommends \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-khmeros \
+    fonts-kacst \
+    fonts-freefont-ttf \
+    libxss1 \
+    --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar pnpm
