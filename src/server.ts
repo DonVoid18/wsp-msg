@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 
-import { WhatsappClient } from "./WhatsappClient";
 import express from "express";
+import { WhatsappClient } from "./WhatsappClient";
 
 dotenv.config();
 
@@ -19,7 +19,6 @@ const supportedImageMimetypes = new Set([
 
 console.log("Iniciando API REST de WhatsApp...");
 console.log(`Puerto configurado: ${port}`);
-console.log(`Webhook URL configurado: ${webhookUrl || "Ninguno"}`);
 console.log(`Ruta de sesión configurada: ${authDataPath}`);
 
 const client = new WhatsappClient({ chromeExecutablePath, authDataPath });
