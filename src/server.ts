@@ -8,13 +8,11 @@ const app = express()
 app.use(express.json({ limit: "50mb" }))
 
 const port = process.env.PORT || 3000
-const webhookUrl = process.env.WEBHOOK_URL || null
 const chromeExecutablePath = process.env.CHROME_PATH || undefined
 const supportedImageMimetypes = new Set(["image/jpeg", "image/jpg", "image/png"])
 
 console.log("Iniciando API REST de WhatsApp...")
 console.log(`Puerto configurado: ${port}`)
-console.log(`Webhook URL configurado: ${webhookUrl || "Ninguno"}`)
 
 const client = new WhatsappClient({ chromeExecutablePath })
 
@@ -38,30 +36,6 @@ client.on("authenticated", () => {
 client.on("disconnected", () => {
   lastQr = null
   console.log("Cliente desconectado de WhatsApp.")
-})
-
-// Reenvío de mensajes entrantes a un Webhook
-client.on("message", async (msgAndContact) => {
-  if (!webhookUrl) return
-
-  try {
-    console.log(`Enviando mensaje recibido de ${msgAndContact.contact.phoneNumber} al webhook...`)
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(msgAndContact)
-    })
-
-    if (!response.ok) {
-      console.error(`Error en la respuesta del Webhook (Status: ${response.status})`)
-    } else {
-      console.log(`Mensaje enviado al Webhook con éxito.`)
-    }
-  } catch (err: any) {
-    console.error(`Fallo al conectar con el Webhook en ${webhookUrl}:`, err.message)
-  }
 })
 
 // Endpoints
